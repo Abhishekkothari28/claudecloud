@@ -218,6 +218,11 @@ h3 { font-size: 19px; }
 .big-name { font-family: var(--font-display); font-size: 40px; font-weight: 700; color: var(--ink); }
 .secret-box { display: flex; gap: 8px; }
 .thinker-zone { border: 2px dashed var(--accent); }
+.code-big { font-family: var(--font-display); font-weight: 700; font-size: 52px; letter-spacing: .18em; background: var(--accent-soft); border: 2px dashed var(--accent); border-radius: 18px; padding: 6px 18px; font-variant-numeric: tabular-nums; }
+.code-input { text-transform: uppercase; letter-spacing: .3em; font-family: var(--font-display); font-weight: 700; font-size: 22px; text-align: center; }
+.pending { background: var(--accent-soft); border-radius: 14px; padding: 12px 14px; font-weight: 800; font-size: 18px; animation: pop .35s ease; overflow-wrap: anywhere; }
+.pending .who { display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .1em; }
+.you-tag { font-size: 11px; font-weight: 800; color: var(--muted); }
 
 /* overlays */
 #fx { position: fixed; inset: 0; pointer-events: none; z-index: 50; width: 100%; height: 100%; }
@@ -287,6 +292,11 @@ h3 { font-size: 19px; }
           <h3>Party mode</h3>
           <p>One player picks a secret word, everyone else takes turns asking. Pass the phone around.</p>
         </button>
+        <button class="mode" id="go-online">
+          <span class="tag">Online · each on their own phone</span>
+          <h3>Online party</h3>
+          <p>Create a room, share the 4-letter code, and play together from different phones or a video call.</p>
+        </button>
       </div>
       <div class="card">
         <h3 style="margin-bottom:8px">How it works</h3>
@@ -295,6 +305,7 @@ h3 { font-size: 19px; }
           <li>Every question uses one of the 21 bulbs. Green means yes, red means no, blue means sometimes.</li>
           <li>The closeness bar fills as you rule things out. Hit a yes on the category and you get a cheer.</li>
           <li>A wrong guess also uses a bulb, so be brave but not reckless.</li>
+          <li>Online party: every friend uses their own phone. They need a Claude account and an invite to this game as an Editor.</li>
         </ul>
       </div>
     </div>
@@ -478,6 +489,123 @@ h3 { font-size: 19px; }
       <div class="card">
         <div class="eyebrow" style="margin-bottom:8px">Scores</div>
         <div class="scoreboard" id="pp-scores"></div>
+      </div>
+    </div>
+  </section>
+  <!-- ONLINE party -->
+  <section id="s-online" class="screen" hidden>
+    <div style="display:flex;flex-direction:column;gap:14px">
+      <div class="host">
+        <div class="mascot" data-mood="happy" data-mascot id="o-mascot"></div>
+        <div class="bubble" id="o-bubble">Play together from different phones. One person creates a room, everyone else joins with the code.</div>
+      </div>
+
+      <div class="card" id="o-unavailable" hidden style="display:flex;flex-direction:column;gap:10px">
+        <h3>Online play isn't available here</h3>
+        <p class="muted" style="margin:0" id="o-unavailable-text">Online play works on the published game link when you're signed in to Claude. You can still play Party mode by passing one phone around.</p>
+        <div class="row"><button class="btn primary" id="o-to-party">Play Party mode instead</button></div>
+      </div>
+
+      <div class="card" id="o-loading" hidden><p class="muted" style="margin:0">Connecting...</p></div>
+
+      <div class="card" id="o-entry" hidden style="display:flex;flex-direction:column;gap:12px">
+        <label class="eyebrow" for="o-name">Your name</label>
+        <input class="text-input" id="o-name" maxlength="16" placeholder="What should we call you?">
+        <div class="row"><button class="btn primary" id="o-create">Create a room</button></div>
+        <div class="eyebrow" style="margin-top:6px">Or join a friend's room</div>
+        <form class="row" id="o-join-form" autocomplete="off">
+          <input class="text-input code-input grow" style="flex-basis:160px" id="o-code" maxlength="4" placeholder="CODE" aria-label="Room code">
+          <button class="btn" type="submit">Join</button>
+        </form>
+      </div>
+
+      <div class="card" id="o-lobby" hidden style="display:flex;flex-direction:column;gap:12px;align-items:center;text-align:center">
+        <div class="eyebrow">Room code</div>
+        <div class="code-big" id="o-lobby-code">ABCD</div>
+        <button class="btn small" id="o-copy">Copy code</button>
+        <p class="muted" style="margin:0">Friends open this same game link, choose Online party, and type the code.</p>
+        <div class="scoreboard" id="o-lobby-players" style="width:100%"></div>
+        <div class="row" style="justify-content:center">
+          <button class="btn primary" id="o-start">Start the game</button>
+          <button class="btn ghost" id="o-leave">Leave room</button>
+        </div>
+        <p class="muted" id="o-lobby-note" style="margin:0;font-size:14px"></p>
+      </div>
+
+      <div class="card handoff" id="o-secret" hidden>
+        <div class="eyebrow" id="o-secret-round">Round 1</div>
+        <div class="big-name">You're the thinker!</div>
+        <p class="muted" style="margin:0">Pick a secret. Only your phone ever knows it.</p>
+        <form id="o-secret-form" style="display:flex;flex-direction:column;gap:12px;width:100%;max-width:380px" autocomplete="off">
+          <div class="secret-box">
+            <input class="text-input grow" id="o-word" type="password" placeholder="Secret word" maxlength="40" aria-label="Secret word">
+            <button class="btn small" type="button" id="o-peek">Show</button>
+          </div>
+          <div class="eyebrow">It's a...</div>
+          <div class="chips" id="o-cats" style="justify-content:center"></div>
+          <button class="btn small ghost" type="button" id="o-random">Give me a random idea</button>
+          <button class="btn primary" type="submit">Lock it in</button>
+        </form>
+      </div>
+
+      <div class="card handoff" id="o-wait" hidden>
+        <div class="eyebrow" id="o-wait-round">Round 1</div>
+        <div class="big-name" id="o-wait-name">Sam</div>
+        <p class="muted" style="margin:0">is choosing a secret. Get your first question ready!</p>
+        <div class="dots"><span></span><span></span><span></span></div>
+      </div>
+
+      <div id="o-play" hidden style="display:flex;flex-direction:column;gap:14px">
+        <div class="card" style="display:flex;flex-direction:column;gap:10px">
+          <div class="row" style="justify-content:space-between"><span class="eyebrow" id="op-round">Round 1</span><span class="eyebrow" id="op-code">Room ABCD</span></div>
+          <div class="turns" id="op-turns"></div>
+        </div>
+        <div class="card marquee">
+          <div class="marquee-head"><span class="eyebrow">Questions left</span><span class="count" id="op-count">21</span></div>
+          <div class="bulbs" id="op-bulbs"></div>
+        </div>
+        <div class="card meter">
+          <div class="meter-head"><span class="eyebrow">How close (set by the thinker)</span><span class="heat-label" id="op-heat">Ice cold</span></div>
+          <div class="bar"><div class="bar-fill" id="op-bar"></div></div>
+          <div class="badges" id="op-badges"></div>
+        </div>
+
+        <div class="card" id="op-asker" hidden style="display:flex;flex-direction:column;gap:12px">
+          <div class="eyebrow">Your turn to ask</div>
+          <form id="op-ask-form" class="row" autocomplete="off">
+            <input id="op-q" class="text-input grow" style="flex-basis:220px" placeholder="Is it bigger than a breadbox?" maxlength="120" aria-label="Your question">
+            <button class="btn primary" type="submit">Ask</button>
+          </form>
+          <form id="op-guess-form" class="row" autocomplete="off">
+            <input id="op-guess" class="text-input grow" style="flex-basis:200px" placeholder="Or make a guess" maxlength="40" aria-label="Your guess">
+            <button class="btn yes" type="submit">Guess</button>
+          </form>
+        </div>
+        <div class="card" id="op-waiting" hidden><p style="margin:0;font-weight:700" id="op-waiting-text">Waiting...</p></div>
+
+        <div class="card thinker-zone" id="op-thinker" hidden style="display:flex;flex-direction:column;gap:10px">
+          <div class="eyebrow">You're the thinker · your secret: <span id="op-mysecret" style="color:var(--ink)"></span></div>
+          <div class="pending" id="op-pending"></div>
+          <div class="answer-grid" id="op-answers">
+            <button class="btn yes" data-a="y">Yes</button>
+            <button class="btn no" data-a="n">No</button>
+            <button class="btn maybe" data-a="s">Sometimes</button>
+            <button class="btn" data-a="u">Don't know</button>
+          </div>
+          <div class="eyebrow">And they're getting...</div>
+          <div class="heat-picker" id="op-heatpick"></div>
+          <div class="row"><button class="btn small" id="op-gotit">They said it out loud. They got it!</button><span class="grow"></span><button class="btn small ghost" id="op-stumped">End round: nobody got it</button></div>
+        </div>
+
+        <div class="row"><button class="btn small hint-btn" id="op-hint">Ask for a hint</button><span class="grow"></span><button class="btn small ghost" id="op-leave">Leave room</button></div>
+        <div class="card">
+          <div class="eyebrow" style="margin-bottom:8px">Questions so far</div>
+          <div class="log" id="op-log" data-empty="No questions yet."></div>
+        </div>
+        <div class="card">
+          <div class="eyebrow" style="margin-bottom:8px">Scores</div>
+          <div class="scoreboard" id="op-scores"></div>
+        </div>
       </div>
     </div>
   </section>
@@ -1554,6 +1682,414 @@ $("#pp-end").onclick = () => {
       m.querySelector("#m-cancel").onclick = closeModal;
     });
 };
+
+/* ============ MODE 4: online party (each player on their own phone) ============ */
+// Shared state: games/<CODE> (one doc per room) and games/<CODE>/players/<uid> (one per player).
+// The secret word lives only in the thinker's private data/users/<uid>/ subtree; the thinker's
+// own phone checks guesses and answers hint requests, so other players never receive it.
+const O = {
+  ready: null, db: null, user: null, uid: null, code: null, game: null, players: [],
+  unsubG: null, unsubP: null, loadTimer: null, writeChain: Promise.resolve(), denied: false,
+  secret: null, secretCat: null, secretRound: 0, ocat: "", seen: null, handled: new Set(), modalShown: null,
+};
+const ROOM_CHARS = "ABCDEFGHJKLMNPQRSTUVWXYZ";
+function onlineInit() {
+  if (O.ready) return O.ready;
+  O.ready = (async () => {
+    if (!window.claude || typeof window.claude.use !== "function") return false;
+    const [db, user] = await Promise.all([window.claude.use("db"), window.claude.use("user")]);
+    if (!db || !user) return false;
+    const uid = await user.id();
+    if (!uid) return false;
+    O.db = db; O.user = user; O.uid = uid;
+    if ((await user.can("data.write")) === false) O.denied = true;
+    return true;
+  })().catch(() => false);
+  return O.ready;
+}
+function gameRef(code) { return O.db.doc("games/" + (code || O.code)); }
+function playerRef(uid) { return O.db.doc("games/" + O.code + "/players/" + (uid || O.uid)); }
+function secretRef() { return O.db.doc("data/users/" + O.uid + "/q21-" + O.code); }
+function oWrite(fn) {
+  // one write at a time, in order
+  O.writeChain = O.writeChain.then(fn).catch(e => {
+    if (e && e.code === "invalid_argument") { O.denied = true; renderOnline(); }
+    else if (e && e.code === "quota_exceeded") toast("The game storage is full. Ask the owner to clear old rooms.");
+    else toast("Couldn't save that move. Check your connection and try again.");
+  });
+  return O.writeChain;
+}
+function gUpdate(patch) { return oWrite(() => gameRef().update(Object.assign({ updatedAt: Date.now() }, patch))); }
+function order() { return O.players.map(p => p.id); }
+function nameOf(uid) { const p = O.players.find(x => x.id === uid); return (p && p.name) || "Player"; }
+function nextAfter(uid, skip) {
+  const ids = order().filter(i => i !== skip); if (!ids.length) return null;
+  const all = order(); let i = all.indexOf(uid);
+  for (let n = 0; n < all.length; n++) { i = (i + 1) % all.length; if (all[i] !== skip) return all[i]; }
+  return ids[0];
+}
+function oShow(id) { ["o-unavailable", "o-loading", "o-entry", "o-lobby", "o-secret", "o-wait", "o-play"].forEach(x => $("#" + x).hidden = x !== id); }
+
+async function openOnline() {
+  show("s-online"); oShow("o-loading");
+  $("#o-name").value = store.get("q21_myname", "");
+  const ok = await onlineInit();
+  if (!ok) {
+    $("#o-unavailable-text").textContent = "Online play works on the published game link when you're signed in to Claude. You can still play Party mode by passing one phone around.";
+    return oShow("o-unavailable");
+  }
+  const last = store.get("q21_room", null);
+  if (last && !O.code) {
+    try { const snap = await gameRef(last).get(); if (snap.exists) return enterRoom(last); } catch (e) { /* fall through */ }
+  }
+  if (O.code) return renderOnline();
+  oShow("o-entry");
+}
+function myName() {
+  const n = $("#o-name").value.trim();
+  if (!n) { toast("Type your name first."); $("#o-name").focus(); return null; }
+  store.set("q21_myname", n); return n;
+}
+function newCode() { let c = ""; for (let i = 0; i < 4; i++) c += ROOM_CHARS[Math.floor(Math.random() * ROOM_CHARS.length)]; return c; }
+async function createRoom() {
+  const name = myName(); if (!name) return;
+  if (O.denied) return renderOnline();
+  let code = newCode();
+  try {
+    for (let i = 0; i < 5; i++) { const s = await gameRef(code).get(); if (!s.exists) break; code = newCode(); }
+    await gameRef(code).set({
+      host: O.uid, status: "lobby", round: 0, limit: 21, createdAt: Date.now(), updatedAt: Date.now(),
+      thinker: null, asker: null, log: [], heat: 0, hints: [], hintReq: 0, pending: null, result: null, scores: {},
+    });
+    O.code = code;
+    await playerRef().set({ name, joinedAt: Date.now() });
+    enterRoom(code);
+  } catch (e) {
+    O.code = null;
+    if (e && e.code === "invalid_argument") { O.denied = true; return renderOnline(); }
+    toast("Couldn't create the room. Check your connection and try again.");
+  }
+}
+async function joinRoom(code) {
+  const name = myName(); if (!name) return;
+  code = code.toUpperCase().replace(/[^A-Z]/g, "");
+  if (code.length !== 4) return toast("Room codes are 4 letters.");
+  try {
+    const snap = await gameRef(code).get();
+    if (!snap.exists) return toast("No room with code " + code + ". Check the letters.");
+    O.code = code;
+    const me = await playerRef().get();
+    if (!me.exists || me.data().name !== name) await playerRef().set({ name, joinedAt: me.exists ? me.data().joinedAt : Date.now() });
+    enterRoom(code);
+  } catch (e) {
+    if (e && e.code === "invalid_argument") { O.denied = true; O.code = code; return renderOnline(); }
+    toast("Couldn't join. Check your connection and try again.");
+  }
+}
+function enterRoom(code) {
+  leaveSubs();
+  O.code = code; O.game = null; O.players = []; O.seen = null; O.handled = new Set(); O.modalShown = null;
+  store.set("q21_room", code);
+  oShow("o-loading");
+  O.loadTimer = setTimeout(() => { if (!O.game) { oShow("o-loading"); $("#o-loading").querySelector("p").textContent = "Can't reach the game server yet. It will connect when your network allows."; } }, 10000);
+  O.unsubG = gameRef().onSnapshot(snap => {
+    if (!snap.metadata.fromCache) clearTimeout(O.loadTimer);
+    if (!snap.exists) { if (!snap.metadata.fromCache) { toast("That room was closed."); leaveRoom(); } return; }
+    O.game = snap.data(); renderOnline();
+  }, () => { clearTimeout(O.loadTimer); toast("Lost connection to the room."); });
+  O.unsubP = O.db.collection("games/" + code + "/players").onSnapshot(qs => {
+    O.players = qs.docs.map(d => Object.assign({ id: d.id }, d.data())).sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
+    renderOnline();
+  }, () => {});
+}
+function leaveSubs() { O.unsubG && O.unsubG(); O.unsubP && O.unsubP(); O.unsubG = O.unsubP = null; clearTimeout(O.loadTimer); }
+function leaveRoom() {
+  leaveSubs(); O.code = null; O.game = null; O.players = []; O.secret = null; store.set("q21_room", null); closeModal();
+  if (!$("#s-online").hidden) oShow("o-entry");
+}
+
+/* ---- rendering ---- */
+let renderQueued = false;
+function renderOnline() { if (renderQueued) return; renderQueued = true; Promise.resolve().then(() => { renderQueued = false; renderOnlineNow(); }); }
+function renderOnlineNow() {
+  if ($("#s-online").hidden) return;
+  if (O.denied) {
+    $("#o-unavailable-text").textContent = "You can open this game but not play online: the owner needs to invite you by email as an Editor (or give you Contributor access on a team plan). Until then you can play Party mode on one phone.";
+    return oShow("o-unavailable");
+  }
+  if (!O.code) return oShow("o-entry");
+  const g = O.game; if (!g) return oShow("o-loading");
+  const isThinker = g.thinker === O.uid;
+  if (g.status === "lobby") return renderLobby(g);
+  if (g.status === "secret") {
+    O.modalShown = null; closeModalIfRound();
+    if (isThinker) {
+      if ($("#o-secret").hidden) { $("#o-word").value = ""; $("#o-word").type = "password"; $("#o-peek").textContent = "Show"; O.ocat = ""; renderOCats(); }
+      $("#o-secret-round").textContent = "Round " + g.round; oShow("o-secret");
+    } else {
+      $("#o-wait-round").textContent = "Round " + g.round; $("#o-wait-name").textContent = nameOf(g.thinker); oShow("o-wait");
+    }
+    trackEffects(g); return;
+  }
+  renderPlay(g);
+}
+function closeModalIfRound() { const m = $("#modal-root .modal"); if (m && m.dataset.online) closeModal(); }
+function renderLobby(g) {
+  oShow("o-lobby");
+  $("#o-lobby-code").textContent = O.code;
+  const box = $("#o-lobby-players"); box.innerHTML = "";
+  O.players.forEach(p => {
+    const r = document.createElement("div"); r.className = "score-row";
+    const n = document.createElement("span"); n.textContent = p.name || "Player";
+    const tag = document.createElement("span"); tag.className = "you-tag";
+    tag.textContent = (p.id === g.host ? "host" : "") + (p.id === O.uid ? (p.id === g.host ? " · you" : "you") : "");
+    r.append(n, tag); box.appendChild(r);
+  });
+  const isHost = g.host === O.uid;
+  $("#o-start").hidden = !isHost;
+  $("#o-start").disabled = O.players.length < 2;
+  $("#o-lobby-note").textContent = isHost ? (O.players.length < 2 ? "Waiting for at least one friend to join." : "Everyone in? Start whenever you're ready.") : "Waiting for " + nameOf(g.host) + " to start the game.";
+  say($("#o-bubble"), O.players.length < 2 ? "Share the code so friends can join!" : `${O.players.length} players in the room. The more the merrier!`);
+}
+function renderOCats() {
+  const cb = $("#o-cats"); cb.innerHTML = "";
+  PARTY_CATS.forEach(c => { const b = document.createElement("button"); b.type = "button"; b.className = "chip" + (c === O.ocat ? " on" : ""); b.textContent = c; b.onclick = () => { O.ocat = c; renderOCats(); }; cb.appendChild(b); });
+}
+async function ensureSecret(g) {
+  if (g.thinker !== O.uid || (O.secret && O.secretRound === g.round)) return;
+  if (O._loadingSecret) return; O._loadingSecret = true;
+  try {
+    const s = await secretRef().get();
+    if (s.exists && s.data().round === g.round) { O.secret = s.data().secret; O.secretCat = s.data().cat; O.secretRound = g.round; renderOnline(); }
+  } catch (e) { /* retried on next snapshot */ } finally { O._loadingSecret = false; }
+}
+function renderPlay(g) {
+  oShow("o-play");
+  const isThinker = g.thinker === O.uid, isAsker = g.asker === O.uid && !isThinker;
+  const log = g.log || [], limit = g.limit || 21, over = g.status === "over";
+  $("#op-round").textContent = "Round " + g.round;
+  $("#op-code").textContent = "Room " + O.code;
+  $("#op-count").textContent = limit - log.length;
+  renderBulbs($("#op-bulbs"), limit, log.map(e => e.a));
+  const won = over && g.result && g.result.won;
+  setBarQuiet($("#op-bar"), won ? 1 : [0.06, 0.25, 0.5, 0.75, 0.92][g.heat || 0]);
+  $("#op-heat").textContent = won ? "Got it!" : HEAT5[g.heat || 0];
+  // turns
+  const turns = $("#op-turns"); turns.innerHTML = "";
+  O.players.forEach(p => {
+    const t = document.createElement("span");
+    t.className = "turn" + (p.id === g.thinker ? " thinker" : "") + (p.id === g.asker && !over ? " now" : "");
+    t.textContent = (p.name || "Player") + (p.id === g.thinker ? " (thinker)" : "") + (p.id === O.uid ? " · you" : "");
+    turns.appendChild(t);
+  });
+  // badges = hints
+  const bb = $("#op-badges"); bb.innerHTML = "";
+  (g.hints || []).forEach(h => addBadge(bb, h));
+  // log (rebuild; cheap at 21 rows)
+  const lg = $("#op-log"); lg.innerHTML = "";
+  log.forEach((e, i) => addLogQuiet(lg, i + 1, e.text, e.a, { y: e.g ? "Correct!" : "Yes", n: "No", s: "Sometimes", u: "Not sure", g: "Not it" }[e.a], nameOf(e.by)));
+  (g.hints || []).forEach(h => { const n = document.createElement("div"); n.className = "note"; n.style.animation = "none"; n.textContent = "Hint: " + h; lg.appendChild(n); });
+  lg.scrollTop = lg.scrollHeight;
+  // scores
+  const sb = $("#op-scores"); sb.innerHTML = ""; const sc = g.scores || {};
+  const max = Math.max(0, ...O.players.map(p => sc[p.id] || 0));
+  O.players.slice().sort((a, b) => (sc[b.id] || 0) - (sc[a.id] || 0)).forEach(p => {
+    const r = document.createElement("div"); r.className = "score-row" + ((sc[p.id] || 0) === max && max > 0 ? " lead" : "");
+    const n = document.createElement("span"); n.textContent = (p.name || "Player") + (p.id === O.uid ? " (you)" : "");
+    const pts = document.createElement("span"); pts.className = "pts"; pts.textContent = (sc[p.id] || 0) + " pts";
+    r.append(n, pts); sb.appendChild(r);
+  });
+  // role panels
+  $("#op-thinker").hidden = !isThinker || over;
+  $("#op-asker").hidden = !isAsker || over || !!g.pending;
+  $("#op-waiting").hidden = over || isThinker || (isAsker && !g.pending);
+  const hintBtn = $("#op-hint"); const hintsN = (g.hints || []).length;
+  hintBtn.hidden = isThinker || over; hintBtn.disabled = hintsN >= 3 || (g.hintReq || 0) > hintsN;
+  hintBtn.textContent = (g.hintReq || 0) > hintsN ? "Hint requested..." : `Ask for a hint (${3 - hintsN} left)`;
+  hintBtn.classList.toggle("pulse", log.length >= 10 && (g.heat || 0) <= 1 && hintsN < 3);
+  if (g.pending) {
+    $("#op-waiting-text").textContent = isAsker ? `Waiting for ${nameOf(g.thinker)} to answer...` : `${nameOf(g.pending.by)} asked: "${g.pending.text}". Waiting for ${nameOf(g.thinker)}...`;
+  } else {
+    $("#op-waiting-text").textContent = `${nameOf(g.asker)} is thinking of a question...`;
+  }
+  if (isThinker && !over) {
+    ensureSecret(g);
+    $("#op-mysecret").textContent = O.secret && O.secretRound === g.round ? O.secret : "(loading)";
+    const pd = $("#op-pending");
+    pd.innerHTML = "";
+    const who = document.createElement("span"); who.className = "who";
+    const q = document.createElement("span");
+    if (g.pending && g.pending.kind === "q") { who.textContent = nameOf(g.pending.by) + " asks"; q.textContent = g.pending.text; }
+    else { who.textContent = nameOf(g.asker) + "'s turn"; q.textContent = "Waiting for a question. If they ask out loud, just tap your answer."; }
+    pd.append(who, q);
+    const hp = $("#op-heatpick"); hp.innerHTML = "";
+    HEAT5.forEach((h, i) => { const b = document.createElement("button"); b.type = "button"; b.textContent = h; b.className = i === (g.heat || 0) ? "on" : ""; b.onclick = () => gUpdate({ heat: i }); hp.appendChild(b); });
+    thinkerDuties(g);
+  }
+  // bubble
+  if (over) {
+    const r = g.result || {};
+    const line = r.won ? `${r.winner === O.uid ? "You" : nameOf(r.winner)} guessed it! It was ${r.secret}.` : `Stumped! It was ${r.secret}.`;
+    if ($("#o-bubble").textContent !== line) say($("#o-bubble"), esc(line));
+  } else {
+    const line = isThinker ? "You're the thinker. Answer each question honestly!" : isAsker ? "Your turn! Ask a yes-or-no question." : `${nameOf(g.asker)} is up. Your turn is coming!`;
+    if ($("#o-bubble").textContent !== line) say($("#o-bubble"), esc(line));
+  }
+  trackEffects(g);
+  if (over) showRoundOver(g);
+}
+function setBarQuiet(el, p) {
+  const pct = Math.max(2, Math.min(100, p * 100)), w = pct + "%";
+  if (el.style.width === w) return; setBar(el, p);
+}
+function addLogQuiet(logEl, num, q, ans, label, who) { const r = addLog(logEl, num, q, ans, label, who); r.style.animation = "none"; r.classList.remove("shake"); return r; }
+
+/* thinker's phone: auto-check guesses, answer hint requests */
+function thinkerDuties(g) {
+  if (!O.secret || O.secretRound !== g.round) return;
+  const p = g.pending;
+  if (p && p.kind === "guess" && !O.handled.has(p.id)) {
+    O.handled.add(p.id);
+    const right = sameWord(p.text, O.secret);
+    const log = (g.log || []).concat([{ by: p.by, text: "Guess: " + p.text, a: right ? "y" : "g", g: right ? 1 : 0 }]);
+    if (right) endOnlineRound(g, true, p.by, log);
+    else if (log.length >= (g.limit || 21)) endOnlineRound(g, false, null, log);
+    else gUpdate({ log, pending: null, asker: nextAfter(g.asker, g.thinker) });
+    return;
+  }
+  const hints = g.hints || [];
+  if ((g.hintReq || 0) > hints.length && hints.length < 3 && !O.handled.has("hint" + g.round + "-" + hints.length)) {
+    O.handled.add("hint" + g.round + "-" + hints.length);
+    const w = O.secret.trim(), n = hints.length;
+    const text = n === 0 ? `It's in the category: ${O.secretCat}` : n === 1 ? `It starts with "${w[0].toUpperCase()}"` : `It has ${w.split(/\s+/).map(x => x.length).join(" + ")} letters`;
+    gUpdate({ hints: hints.concat([text]) });
+  }
+}
+function thinkerAnswer(a) {
+  const g = O.game; if (!g || g.thinker !== O.uid || g.status !== "playing") return;
+  if (g.pending && g.pending.kind === "guess") return;
+  const p = g.pending;
+  const log = (g.log || []).concat([{ by: p ? p.by : g.asker, text: p ? p.text : "(asked out loud)", a }]);
+  if (log.length >= (g.limit || 21)) return endOnlineRound(g, false, null, log);
+  gUpdate({ log, pending: null, asker: nextAfter(g.asker, g.thinker) });
+}
+function endOnlineRound(g, won, winner, log) {
+  const scores = Object.assign({}, g.scores || {});
+  const used = (log || g.log || []).length, hintsUsed = (g.hints || []).length;
+  let pts;
+  if (won) { pts = Math.max(1, 5 + ((g.limit || 21) - used) - hintsUsed); scores[winner] = (scores[winner] || 0) + pts; }
+  else { pts = 15; scores[g.thinker] = (scores[g.thinker] || 0) + pts; }
+  gUpdate({ status: "over", log: log || g.log || [], pending: null, scores, result: { won, winner: winner || null, secret: O.secret || "", pts } });
+}
+
+/* effects every phone plays when shared state changes */
+function trackEffects(g) {
+  const cur = { round: g.round, logLen: (g.log || []).length, heat: g.heat || 0, status: g.status, hints: (g.hints || []).length };
+  const prev = O.seen; O.seen = cur;
+  if (!prev || prev.round !== cur.round) return;
+  const log = g.log || [];
+  for (let i = prev.logLen; i < cur.logLen; i++) {
+    const e = log[i];
+    if (e.a === "y" && !e.g) {
+      Sound.yes();
+      const yes = log.slice(0, i + 1).filter(x => x.a === "y" && !x.g).length;
+      const who = e.by === O.uid ? "You" : nameOf(e.by);
+      if (/\b(animal|food|object|place|person|vehicle|plant|thing|nature)\b/i.test(e.text)) cheer("Category unlocked!", who + " cracked it open", true);
+      else if (yes === 1) cheer("First yes!", who + " found a clue");
+      else burst(innerWidth / 2, innerHeight * 0.4, 30, 6);
+      mood($("#o-mascot"), "happy");
+    } else if (e.a === "n" || e.a === "g") { Sound.no(); mood($("#o-mascot"), "sad", 1000); }
+    else if (e.a === "s") Sound.maybe();
+  }
+  if (cur.heat > prev.heat && cur.status === "playing") cheer(cur.heat >= 4 ? "On fire!" : cur.heat === 3 ? "Hot!" : cur.heat === 2 ? "Warmer!" : "Thawing out!", "Getting closer", cur.heat >= 4);
+  if (cur.hints > prev.hints) { Sound.maybe(); toast("New hint: " + g.hints[cur.hints - 1]); }
+  if (prev.status !== "over" && cur.status === "over" && g.result) {
+    if (g.result.won) { Sound.win(); rain(200); cheer((g.result.winner === O.uid ? "You" : nameOf(g.result.winner)) + " got it!", g.result.secret, true); }
+    else { Sound.lose(); cheer("Stumped!", nameOf(g.thinker) + " wins the round"); }
+  }
+  if (prev.status === "secret" && cur.status === "playing" && g.thinker !== O.uid) { Sound.cheer(); toast(nameOf(g.thinker) + " has a secret. Game on!"); }
+}
+function showRoundOver(g) {
+  const key = O.code + "-" + g.round;
+  if (O.modalShown === key) return; O.modalShown = key;
+  const r = g.result || {}; const nextT = nextAfter(g.thinker, null);
+  const iAmNext = nextT === O.uid || (!O.players.some(p => p.id === nextT) && g.host === O.uid);
+  const msg = r.won ? `${r.winner === O.uid ? "You" : esc(nameOf(r.winner))} got it with ${(g.log || []).length} questions and earn${r.winner === O.uid ? "" : "s"} ${r.pts} points.`
+    : `Nobody got it. ${esc(nameOf(g.thinker))} earns ${r.pts} points for stumping everyone.`;
+  setTimeout(() => {
+    if (!O.game || O.game.status !== "over" || O.game.round !== g.round) return;
+    modal(`<div class="eyebrow">Round ${g.round} over</div><h2>The secret was</h2><div class="reveal">${esc(r.secret || "?")}</div>
+      <p style="margin:0">${msg}</p>
+      <div class="row" style="justify-content:center">${iAmNext ? `<button class="btn primary" id="m-onext">Start round ${g.round + 1}: you think</button>` : `<span class="muted">Waiting for ${esc(nameOf(nextT))} to start the next round...</span>`}<button class="btn ghost" id="m-oclose">See the board</button></div>`,
+      m => {
+        m.dataset.online = "1";
+        const nb = m.querySelector("#m-onext"); if (nb) nb.onclick = () => { closeModal(); nextOnlineRound(); };
+        m.querySelector("#m-oclose").onclick = closeModal;
+      });
+  }, r.won ? 1400 : 700);
+}
+function nextOnlineRound() {
+  const g = O.game; if (!g || g.status !== "over") return;
+  gUpdate({ status: "secret", round: g.round + 1, thinker: nextAfter(g.thinker, null) || O.uid, asker: null, log: [], heat: 0, hints: [], hintReq: 0, pending: null, result: null });
+}
+
+/* wiring */
+$("#go-online").onclick = openOnline;
+$("#o-to-party").onclick = () => $("#go-party").click();
+$("#o-create").onclick = createRoom;
+$("#o-join-form").onsubmit = e => { e.preventDefault(); joinRoom($("#o-code").value); };
+$("#o-copy").onclick = () => {
+  const done = () => toast("Code copied: " + O.code);
+  try { navigator.clipboard.writeText(O.code).then(done, () => toast("Room code: " + O.code)); } catch (e) { toast("Room code: " + O.code); }
+};
+$("#o-start").onclick = () => {
+  const g = O.game; if (!g || g.host !== O.uid || O.players.length < 2) return;
+  const scores = {}; O.players.forEach(p => scores[p.id] = 0);
+  gUpdate({ status: "secret", round: 1, thinker: order()[0], asker: null, log: [], heat: 0, hints: [], hintReq: 0, pending: null, result: null, scores });
+};
+$("#o-leave").onclick = leaveRoom;
+$("#op-leave").onclick = () => modal(`<h2>Leave the room?</h2><p class="muted" style="margin:0">You can rejoin later with code ${esc(O.code)}.</p>
+  <div class="row" style="justify-content:center"><button class="btn" id="m-stay">Stay</button><button class="btn no" id="m-go">Leave</button></div>`,
+  m => { m.querySelector("#m-stay").onclick = closeModal; m.querySelector("#m-go").onclick = leaveRoom; });
+$("#o-peek").onclick = () => { const w = $("#o-word"); w.type = w.type === "password" ? "text" : "password"; $("#o-peek").textContent = w.type === "password" ? "Show" : "Hide"; };
+$("#o-random").onclick = () => {
+  const it = pick(BASE); $("#o-word").value = it.name; $("#o-word").type = "text"; $("#o-peek").textContent = "Hide";
+  O.ocat = { animal: "Animal", food: "Food", object: "Object", vehicle: "Object", place: "Place", plant: "Other", nature: "Other" }[it.cat]; renderOCats();
+};
+$("#o-secret-form").onsubmit = async e => {
+  e.preventDefault();
+  const g = O.game; if (!g || g.thinker !== O.uid) return;
+  const w = $("#o-word").value.trim();
+  if (!w) return toast("Type a secret word first.");
+  if (!O.ocat) return toast("Pick a category so hints work.");
+  try {
+    await secretRef().set({ secret: w, cat: O.ocat, round: g.round });
+  } catch (err) { if (err && err.code === "invalid_argument") { O.denied = true; return renderOnline(); } return toast("Couldn't save your secret. Try again."); }
+  O.secret = w; O.secretCat = O.ocat; O.secretRound = g.round; $("#o-word").value = "";
+  gUpdate({ status: "playing", asker: nextAfter(g.thinker, g.thinker) });
+};
+$("#op-ask-form").onsubmit = e => {
+  e.preventDefault(); const g = O.game; const t = $("#op-q").value.trim();
+  if (!t || !g || g.asker !== O.uid || g.pending) return;
+  $("#op-q").value = "";
+  gUpdate({ pending: { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: O.uid, text: t.replace(/\??$/, "?"), kind: "q" } });
+};
+$("#op-guess-form").onsubmit = e => {
+  e.preventDefault(); const g = O.game; const t = $("#op-guess").value.trim();
+  if (!t || !g || g.asker !== O.uid || g.pending) return;
+  $("#op-guess").value = "";
+  gUpdate({ pending: { id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), by: O.uid, text: t, kind: "guess" } });
+};
+$$("#op-answers [data-a]").forEach(b => b.onclick = () => thinkerAnswer(b.dataset.a));
+$("#op-hint").onclick = () => { const g = O.game; if (!g) return; const n = (g.hints || []).length; if (n < 3 && (g.hintReq || 0) <= n) gUpdate({ hintReq: n + 1 }); };
+$("#op-gotit").onclick = () => {
+  const g = O.game; if (!g || g.thinker !== O.uid) return;
+  const log = (g.log || []).concat([{ by: g.asker, text: "Guessed it out loud", a: "y", g: 1 }]);
+  endOnlineRound(g, true, g.asker, log);
+};
+$("#op-stumped").onclick = () => modal(`<h2>End the round?</h2><p class="muted" style="margin:0">Nobody guessed it, so you score 15 points.</p>
+  <div class="row" style="justify-content:center"><button class="btn" id="m-no">Keep playing</button><button class="btn no" id="m-yes">End round</button></div>`,
+  m => { m.querySelector("#m-no").onclick = closeModal; m.querySelector("#m-yes").onclick = () => { closeModal(); endOnlineRound(O.game, false, null, O.game.log); }; });
 
 /* keyboard shortcuts for answering (computer-guesses mode) */
 document.addEventListener("keydown", e => {

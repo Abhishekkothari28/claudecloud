@@ -8,6 +8,8 @@ A yes-or-no guessing game in a single file. Open `index.html` in any browser. No
 - **I guess your word (1 player).** You think of something, and the computer asks questions and guesses. It picks whichever question splits the remaining possibilities most evenly. If you stump it, you can teach it the answer (saved in your browser).
 - **Party mode (2 to 8 players, pass-and-play).** Each round one player types a secret word while the others look away. Then the others take turns asking, out loud or typed, and the thinker taps Yes / No / Sometimes / Don't know and sets how hot the guessers are. A correct guess scores 5 points plus 1 per question left. If nobody gets it, the thinker scores 15.
 
+- **Online party (each player on their own phone).** One player creates a room and shares a 4-letter code; friends join from their own phones. Only the thinker's phone ever knows the secret: it checks guesses and answers hint requests automatically. Every phone gets the same cheers and confetti live. This mode runs only on the published claude.ai link, which provides the shared database. Each player must be signed in and allowed to edit the game's data (on a personal plan, invite them by email as an Editor).
+
 ## What makes it fun
 
 - 21 marquee bulbs track your questions: green for yes, red for no, blue for sometimes.
